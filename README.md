@@ -1,4 +1,3 @@
-# Simple-Bank-Account-System
 # Simple Bank Account System (C)
 
 A simple command-line banking system written in C that allows users to create accounts, deposit money, withdraw money, and check account balances.
