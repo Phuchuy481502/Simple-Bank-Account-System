@@ -22,12 +22,81 @@ typedef struct {
     int    history_count;
 } Account;
 
-static Account accounts[MAX_ACCOUNTS] = {
-    { 1001, "Nguyen Tran Phuc",  "1234", 5000000.0, {}, 0 },
-    { 1002, "Tran Van A",        "5678", 3200000.0, {}, 0 },
-    { 1003, "Le Thi B",          "9999", 8500000.0, {}, 0 },
-};
-static int account_count = 3;
+static Account accounts[MAX_ACCOUNTS];
+static int account_count = 0;
+
+static char account_file_path[260] = "accounts.txt";
+
+/* Build path to accounts.txt relative to the executable */
+void build_account_path(const char *exe_path) {
+    strncpy(account_file_path, exe_path, sizeof(account_file_path) - 1);
+    /* Find last slash or backslash */
+    char *last_sep = strrchr(account_file_path, '\\');
+    char *last_fwd = strrchr(account_file_path, '/');
+    if (last_fwd && (!last_sep || last_fwd > last_sep))
+        last_sep = last_fwd;
+    if (last_sep)
+        strcpy(last_sep + 1, "accounts.txt");
+    else
+        strcpy(account_file_path, "accounts.txt");
+}
+
+/* Load accounts from file */
+int load_accounts(void) {
+    FILE *fp = fopen(account_file_path, "r");
+    if (!fp) {
+        printf("Error: Cannot open %s\n", account_file_path);
+        return 0;
+    }
+
+    fscanf(fp, "%d", &account_count);
+    for (int i = 0; i < account_count && i < MAX_ACCOUNTS; i++) {
+        fscanf(fp, "%d %s %s %lf",
+               &accounts[i].id,
+               accounts[i].name,
+               accounts[i].pin,
+               &accounts[i].balance);
+        accounts[i].history_count = 0;
+
+        /* Convert underscores to spaces in name */
+        for (int j = 0; accounts[i].name[j]; j++) {
+            if (accounts[i].name[j] == '_')
+                accounts[i].name[j] = ' ';
+        }
+    }
+
+    fclose(fp);
+    return 1;
+}
+
+/* Save accounts to file */
+void save_accounts(void) {
+    FILE *fp = fopen(account_file_path, "w");
+    if (!fp) {
+        printf("Error: Cannot write to %s\n", account_file_path);
+        return;
+    }
+
+    fprintf(fp, "%d\n", account_count);
+    for (int i = 0; i < account_count; i++) {
+        /* Convert spaces to underscores for saving */
+        char name_copy[50];
+        strncpy(name_copy, accounts[i].name, sizeof(name_copy) - 1);
+        name_copy[sizeof(name_copy) - 1] = '\0';
+        for (int j = 0; name_copy[j]; j++) {
+            if (name_copy[j] == ' ')
+                name_copy[j] = '_';
+        }
+
+        fprintf(fp, "%d %s %s %.1f\n",
+                accounts[i].id,
+                name_copy,
+                accounts[i].pin,
+                accounts[i].balance);
+    }
+
+    fclose(fp);
+}
 
 void print_line(void) {
     printf("========================================\n");
@@ -113,6 +182,7 @@ void deposit(Account *acc) {
 
     acc->balance += amount;
     add_transaction(acc, "Deposit", amount);
+    save_accounts();
     printf("  Deposited %.0f VND successfully\n", amount);
     printf("  New balance: %.0f VND\n", acc->balance);
 }
@@ -161,6 +231,7 @@ void withdraw(Account *acc) {
 
     acc->balance -= amount;
     add_transaction(acc, "Withdraw", -amount);
+    save_accounts();
     printf("  Withdrew %.0f VND successfully\n", amount);
     printf("  New balance: %.0f VND\n", acc->balance);
 }
@@ -221,6 +292,7 @@ void transfer(Account *acc) {
     snprintf(desc_recv, sizeof(desc_recv), "Received from %d", acc->id);
     add_transaction(acc,  desc_send, -amount);
     add_transaction(dest, desc_recv,  amount);
+    save_accounts();
 
     printf("  Transferred %.0f VND successfully!\n", amount);
     printf("  New balance: %.0f VND\n", acc->balance);
@@ -279,6 +351,7 @@ void change_pin(Account *acc) {
     }
 
     strncpy(acc->pin, new_pin, PIN_LENGTH);
+    save_accounts();
     printf("  PIN changed successfully!\n");
 }
 
@@ -322,9 +395,17 @@ void main_menu(Account *acc) {
     }
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
     printf("\n  ATM Simulation v1.0\n");
-    printf("  Available accounts: 1001, 1002, 1003\n");
+
+    build_account_path(argv[0]);
+
+    if (!load_accounts()) {
+        printf("  Failed to load account data!\n");
+        return 1;
+    }
+
+    printf("  Loaded %d accounts from %s\n", account_count, account_file_path);
 
     Account *acc = authenticate();
     if (acc) main_menu(acc);
