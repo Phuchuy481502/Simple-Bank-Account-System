@@ -16,3 +16,18 @@ A simple command-line banking system written in C that allows users to create ac
 - Command Line Interface (CLI)
 
 ## Project Structure
+bank-system
+│
+├── main.c
+├── accounts.txt
+└── README.md
+
+## Demo 
+![Demo](Demo-bank.png)
+
+## How to Compile
+
+```bash
+gcc main.c -o bank
+
+
